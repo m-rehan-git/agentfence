@@ -1,0 +1,105 @@
+# =============================================================================
+# AgentFence — Full Stack Docker Compose
+# =============================================================================
+# Usage:
+#   docker compose up -d          # start full stack
+#   docker compose up gateway     # start only the gateway
+#   docker compose down           # stop everything
+# =============================================================================
+
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Gateway — FastAPI REST API
+  # ---------------------------------------------------------------------------
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentfence-gateway
+    ports:
+      - "${AF_GATEWAY_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - AF_DATABASE_URL=sqlite+aiosqlite:///./data/agentfence.db
+      - AF_TRACES_DIR=/app/traces
+    volumes:
+      - agentfence-data:/app/data
+      - agentfence-traces:/app/traces
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - agentfence-net
+    depends_on:
+      redis:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Dashboard — Streamlit UI
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agentfence-dashboard
+    command: >
+      streamlit run agentfence/dashboard/app.py
+      --server.port ${AF_DASHBOARD_PORT:-8501}
+      --server.address 0.0.0.0
+      --server.headless true
+    ports:
+      - "${AF_DASHBOARD_PORT:-8501}:8501"
+    env_file:
+      - .env
+    environment:
+      - AF_GATEWAY_URL=http://gateway:8000
+    restart: unless-stopped
+    networks:
+      - agentfence-net
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Redis — (optional) caching & rate-limit backend for future scaling
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: agentfence-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - agentfence-redis:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    networks:
+      - agentfence-net
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  agentfence-net:
+    driver: bridge
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  agentfence-data:
+    driver: local
+  agentfence-traces:
+    driver: local
+  agentfence-redis:
+    driver: local

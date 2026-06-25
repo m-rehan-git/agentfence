@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentfence"
+version = "0.1.0"
+description = "AgentFence — guardrails, budget enforcement, and observability for AI agent workloads"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "AgentFence Team", email = "team@agentfence.dev" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Security :: Cryptography",
+    "Topic :: System :: Monitoring",
+]
+
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "tiktoken>=0.7",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "httpx>=0.27",
+    "aiosqlite>=0.20",
+    "streamlit>=1.35",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "black>=24.4",
+]
+
+[project.scripts]
+agentfence = "agentfence.cli:main"
+agentfence-gateway = "agentfence.gateway:main"
+agentfence-dashboard = "agentfence.dashboard:main"
+
+[tool.setuptools.packages.find]
+include = ["agentfence*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = ["-v"]
+
+

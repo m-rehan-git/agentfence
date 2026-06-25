@@ -1,0 +1,11 @@
+{
+  "models": {
+    "gpt-4o": {"input_per_1k": 0.005, "output_per_1k": 0.015, "provider": "openai"},
+    "gpt-4o-mini": {"input_per_1k": 0.00015, "output_per_1k": 0.0006, "provider": "openai"},
+    "gpt-3.5-turbo": {"input_per_1k": 0.0005, "output_per_1k": 0.0015, "provider": "openai"},
+    "openrouter/owl-alpha": {"input_per_1k": 0.001, "output_per_1k": 0.003, "provider": "openrouter"},
+    "local/ollama/llama3": {"input_per_1k": 0.0, "output_per_1k": 0.0, "provider": "local"},
+    "local/ollama/mistral": {"input_per_1k": 0.0, "output_per_1k": 0.0, "provider": "local"},
+    "local/llama-cpp": {"input_per_1k": 0.0, "output_per_1k": 0.0, "provider": "local"}
+  }
+}
