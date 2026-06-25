@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentFence — Multi-stage Production Dockerfile
+# Sentinel — Multi-stage Production Dockerfile
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -41,10 +41,10 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
 # Metadata labels
-LABEL maintainer="AgentFence Team <team@agentfence.dev>" \
-      version="0.1.0" \
-      description="AgentFence — guardrails, budget enforcement, and observability for AI agent workloads" \
-      org.opencontainers.image.source="https://github.com/agentfence/agentfence" \
+LABEL maintainer="Sentinel Team <team@sentinel.dev>" \
+      version="0.3.0" \
+      description="Sentinel — guardrails, budget enforcement, and observability for AI agent workloads" \
+      org.opencontainers.image.source="https://github.com/m-rehan-git/sentinel" \
       org.opencontainers.image.licenses="MIT"
 
 # Create non-root user
@@ -74,4 +74,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Default command: start the gateway
-CMD ["uvicorn", "agentfence.gateway:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "sentinel.gateway:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -15,8 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from agentfence.models import TraceStep
-from agentfence.tracer import Tracer
+from sentinel.models import TraceStep
+from sentinel.tracer import Tracer
 
 logger = logging.getLogger(__name__)
 

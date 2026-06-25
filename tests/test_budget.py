@@ -16,12 +16,11 @@ from __future__ import annotations
 
 import threading
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
-from agentfence.budget_enforcer import BudgetEnforcer
-from agentfence.models import BudgetConfig, CircuitBreakerException
+from sentinel.budget_enforcer import BudgetEnforcer
+from sentinel.models import BudgetConfig, CircuitBreakerException
 
 
 # ---------------------------------------------------------------------------

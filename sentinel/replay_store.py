@@ -12,7 +12,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from agentfence.config import get_config
+from sentinel.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class ReplayStore:
             if db_url.startswith("sqlite:///"):
                 self._db_path = Path(db_url.replace("sqlite:///", ""))
             else:
-                self._db_path = Path("agentfence.db")
+                self._db_path = Path("sentinel.db")
 
         self._lock = threading.Lock()
         self._init_db()

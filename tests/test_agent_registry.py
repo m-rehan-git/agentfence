@@ -1,8 +1,7 @@
-"""Tests for AgentFence agent registry and authentication."""
+"""Tests for Sentinel agent registry and authentication."""
 from __future__ import annotations
 
-import pytest
-from agentfence.agent_registry import AgentRegistry, AgentIdentity
+from sentinel.agent_registry import AgentRegistry, AgentIdentity
 
 
 class TestAgentRegistry:

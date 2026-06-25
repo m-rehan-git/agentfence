@@ -1,13 +1,11 @@
-"""Tests for AgentFence security layer."""
+"""Tests for Sentinel security layer."""
 from __future__ import annotations
 
-import pytest
-from agentfence.security import (
+from sentinel.security import (
     ToolSandbox,
     RateLimiter,
     AuditLogger,
     InputValidator,
-    ToolPolicy,
     AgentPolicy,
     SecurityEventType,
     RiskLevel,

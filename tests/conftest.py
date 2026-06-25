@@ -1,5 +1,5 @@
 """
-Production pytest conftest for AgentFence.
+Production pytest conftest for Sentinel.
 
 Provides:
 - Project root on sys.path (via pytest_configure)
@@ -9,10 +9,9 @@ Provides:
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 
@@ -22,7 +21,7 @@ import pytest
 
 def pytest_configure(config: pytest.Config) -> None:
     """Set up the test environment before any tests are collected."""
-    # Ensure project root is on sys.path so `import agentfence` works
+    # Ensure project root is on sys.path so `import sentinel` works
     project_root = Path(__file__).resolve().parent.parent
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
@@ -58,7 +57,7 @@ def temp_dir(tmp_path: Path) -> Path:
 def config(temp_dir: Path) -> dict[str, Any]:
     """Provide a test configuration dict with temporary paths."""
     return {
-        "db_path": str(temp_dir / "test_agentfence.db"),
+        "db_path": str(temp_dir / "test_sentinel.db"),
         "traces_dir": str(temp_dir / "traces"),
         "budget_db_path": str(temp_dir / "test_budget.db"),
         "default_budget_usd": 1.00,
@@ -69,7 +68,7 @@ def config(temp_dir: Path) -> dict[str, Any]:
 @pytest.fixture
 def budget_enforcer(temp_dir: Path) -> "BudgetEnforcer":
     """Create a BudgetEnforcer backed by a temporary SQLite database."""
-    from agentfence.budget_enforcer import BudgetEnforcer
+    from sentinel.budget_enforcer import BudgetEnforcer
 
     db_path = temp_dir / "test_budget.db"
     return BudgetEnforcer(db_path=db_path)
@@ -78,7 +77,7 @@ def budget_enforcer(temp_dir: Path) -> "BudgetEnforcer":
 @pytest.fixture
 def tracer(temp_dir: Path) -> "Tracer":
     """Create a Tracer with temporary directories for JSONL and SQLite."""
-    from agentfence.tracer import Tracer
+    from sentinel.tracer import Tracer
 
     traces_dir = temp_dir / "traces"
     db_path = temp_dir / "test_traces.db"
@@ -88,9 +87,9 @@ def tracer(temp_dir: Path) -> "Tracer":
 
 @pytest.fixture
 def client() -> "TestClient":
-    """Provide a FastAPI TestClient for the AgentFence gateway."""
+    """Provide a FastAPI TestClient for the Sentinel gateway."""
     from fastapi.testclient import TestClient
 
-    from agentfence.gateway import app
+    from sentinel.gateway import app
 
     return TestClient(app)

@@ -10,10 +10,8 @@ Provides:
 from __future__ import annotations
 
 import hashlib
-import hmac
 import json
 import logging
-import os
 import secrets
 import sqlite3
 import threading
@@ -23,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from agentfence.config import get_config
+from sentinel.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +103,7 @@ class AgentRegistry:
             if db_url.startswith("sqlite:///"):
                 self._db_path = Path(db_url.replace("sqlite:///", ""))
             else:
-                self._db_path = Path("agentfence.db")
+                self._db_path = Path("sentinel.db")
 
         self._lock = threading.Lock()
         self._init_db()

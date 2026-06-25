@@ -1,5 +1,5 @@
 """
-Structured logging setup for AgentFence.
+Structured logging setup for Sentinel.
 
 Provides a single ``get_logger(name)`` entry point that returns a fully
 configured ``logging.Logger`` instance. In production mode (default),
@@ -7,7 +7,7 @@ log lines are emitted as JSON with timestamp, level, module, and message.
 In development / readable mode, a human-readable format is used.
 
 Usage:
-    from agentfence.logging import get_logger
+    from sentinel.logging import get_logger
     logger = get_logger(__name__)
     logger.info("Tool executed", extra={"cost_usd": 0.01, "model": "gpt-4o"})
 """
@@ -20,7 +20,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from agentfence.config import get_config
+from sentinel.config import get_config
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ _loggers_configured = False
 
 def _configure_root_logger() -> None:
     """
-    Configure the root ``agentfence`` logger based on current config settings.
+    Configure the root ``sentinel`` logger based on current config settings.
 
     This is called once on first use of ``get_logger()``. It is safe to
     call multiple times — subsequent calls are no-ops.
@@ -128,7 +128,7 @@ def _configure_root_logger() -> None:
     else:
         handler.setFormatter(_ReadableFormatter())
 
-    root = logging.getLogger("agentfence")
+    root = logging.getLogger("sentinel")
     root.setLevel(level)
     root.handlers.clear()
     root.addHandler(handler)
@@ -160,7 +160,7 @@ def get_logger(name: str) -> logging.Logger:
     Return a structured logger for the given module name.
 
     The logger is automatically configured on first call based on the
-    current ``agentfence.config`` settings (log level, format, file).
+    current ``sentinel.config`` settings (log level, format, file).
 
     Args:
         name: Typically ``__name__`` of the calling module.
@@ -169,4 +169,4 @@ def get_logger(name: str) -> logging.Logger:
         A configured ``logging.Logger`` instance.
     """
     _configure_root_logger()
-    return logging.getLogger(f"agentfence.{name}")
+    return logging.getLogger(f"sentinel.{name}")

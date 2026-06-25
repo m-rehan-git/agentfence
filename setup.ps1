@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentFence — One-Click Windows Setup Script
+# Sentinel — One-Click Windows Setup Script
 # =============================================================================
 # Usage:
 #   .\setup.ps1                # run normally
@@ -91,7 +91,7 @@ if (-not $WhatIf) {
     Write-Host "  Upgrading pip..."
     & $venvPython -m pip install --upgrade pip setuptools wheel 2>&1 | Out-Null
 
-    Write-Host "  Installing agentfence with dev dependencies..."
+    Write-Host "  Installing sentinel with dev dependencies..."
     & $venvPip install -e ".[dev]" 2>&1
 
     if ($LASTEXITCODE -ne 0) {
@@ -162,14 +162,14 @@ else {
 # ---------------------------------------------------------------------------
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
-Write-Host "  AgentFence setup complete!" -ForegroundColor Green
+Write-Host "  Sentinel setup complete!" -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "  1. Edit .env to configure your API key and settings"
-Write-Host "  2. Start the gateway:  python -m agentfence.gateway"
-Write-Host "     or:                  agentfence-gateway"
-Write-Host "  3. Start the dashboard: agentfence-dashboard"
-Write-Host "     or:                  streamlit run agentfence/dashboard/app.py"
+Write-Host "  2. Start the gateway:  python -m sentinel.gateway"
+Write-Host "     or:                  sentinel-gateway"
+Write-Host "  3. Start the dashboard: sentinel-dashboard"
+Write-Host "     or:                  streamlit run sentinel/dashboard/app.py"
 Write-Host "  4. Visit http://localhost:8501 for the dashboard"
 Write-Host ""

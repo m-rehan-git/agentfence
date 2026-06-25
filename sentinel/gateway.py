@@ -22,7 +22,6 @@ Features:
 from __future__ import annotations
 
 import logging
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -31,21 +30,22 @@ from typing import Any, Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from agentfence.config import get_config
-from agentfence.budget_enforcer import BudgetEnforcer
-from agentfence.cost_engine import calculate_actual_cost, count_tokens, estimate_cost
-from agentfence.models import (
+from sentinel.config import get_config
+from sentinel.budget_enforcer import BudgetEnforcer
+from sentinel.cost_engine import calculate_actual_cost, count_tokens, estimate_cost
+from sentinel.models import (
     CircuitBreakerException,
+    OpenAIChatRequest,
+    OpenAIChatResponse,
     ToolRequest,
     ToolResponse,
     TraceStep,
 )
-from agentfence.replay import ReplayEngine
-from agentfence.tracer import Tracer
-from agentfence.security import (
+from sentinel.replay import ReplayEngine
+from sentinel.tracer import Tracer
+from sentinel.security import (
     ToolSandbox,
     RateLimiter,
     AuditLogger,
@@ -53,8 +53,8 @@ from agentfence.security import (
     SecurityEventType,
     RiskLevel,
 )
-from agentfence.agent_registry import AgentRegistry, AgentIdentity
-from agentfence.replay_store import ReplayStore
+from sentinel.agent_registry import AgentRegistry
+from sentinel.replay_store import ReplayStore
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ async def lifespan(app: FastAPI):
         _cors_configured = True
 
     logger.info(
-        "AgentFence starting up",
+        "Sentinel starting up",
         extra={
             "version": "0.2.0",
             "mock_mode": cfg.is_mock_mode,
@@ -119,28 +119,28 @@ async def lifespan(app: FastAPI):
             SecurityEventType.SYSTEM_STARTUP,
             details={"version": "0.2.0", "mock_mode": cfg.is_mock_mode},
         )
-        logger.info("AgentFence startup complete")
+        logger.info("Sentinel startup complete")
     except Exception as e:
-        logger.error("AgentFence startup failed", extra={"error": str(e)})
+        logger.error("Sentinel startup failed", extra={"error": str(e)})
         raise
 
     yield
 
-    logger.info("AgentFence shutting down")
+    logger.info("Sentinel shutting down")
     if _audit:
         _audit.log(SecurityEventType.SYSTEM_SHUTDOWN)
     if _budget_enforcer:
         _budget_enforcer.close()
     if _tracer:
         _tracer.close()
-    logger.info("AgentFence shutdown complete")
+    logger.info("Sentinel shutdown complete")
 
 
 # ---------------------------------------------------------------------------
 # FastAPI application
 # ---------------------------------------------------------------------------
 app = FastAPI(
-    title="AgentFence",
+    title="Sentinel",
     version="0.2.0",
     description="AI agent infrastructure: cost control, execution monitoring, failure replay.",
     lifespan=lifespan,
@@ -309,7 +309,7 @@ async def health_check() -> dict:
 @app.post("/v1/execute", response_model=ToolResponse)
 async def execute_tool(request: ToolRequest) -> ToolResponse:
     """
-    Execute a tool call through AgentFence.
+    Execute a tool call through Sentinel.
 
     Flow:
     1. Validate request (Pydantic).
@@ -353,14 +353,12 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
             raise HTTPException(status_code=401, detail="Invalid agent API key")
         effective_agent_id = agent.agent_id
         agent_budget_cap = agent.max_budget_usd
-        agent_max_rpm = agent.max_requests_per_minute
         agent_allowed_tools = agent.allowed_tools
         agent_blocked_tools = agent.blocked_tools
     else:
         # Default agent (no key provided) — most restrictive defaults
         effective_agent_id = agent_id or "default"
         agent_budget_cap = cfg.default_budget_usd
-        agent_max_rpm = cfg.gateway.rate_limit_rpm
         agent_allowed_tools = set()
         agent_blocked_tools = set()
     # Step 2: Security — Sandbox check
@@ -368,7 +366,7 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
         # Build agent policy for sandbox check
         agent_policy = None
         if agent_allowed_tools or agent_blocked_tools:
-            from agentfence.security import AgentPolicy
+            from sentinel.security import AgentPolicy
             agent_policy = AgentPolicy(
                 agent_id=effective_agent_id,
                 allowed_tools=agent_allowed_tools,
@@ -514,7 +512,7 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
     try:
         if cfg.is_mock_mode:
             mock_output = (
-                f"[AgentFence Mock] Tool '{request.tool_name}' "
+                f"[Sentinel Mock] Tool '{request.tool_name}' "
                 f"called with model '{request.model}'. "
                 f"Set AF_MOCK_MODE=false and provide AF_API_KEY to use a real provider."
             )
@@ -548,7 +546,7 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
                 input_tokens, output_tokens = _extract_token_usage(response_data)
         else:
             output_text = (
-                f"[AgentFence Mock] Tool '{request.tool_name}' "
+                f"[Sentinel Mock] Tool '{request.tool_name}' "
                 f"executed with params: {request.params}"
             )
             input_tokens = count_tokens(request.estimated_input, request.model)
@@ -643,6 +641,222 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
         execution_time_ms=round(elapsed_ms, 2),
         trace_step_id=step_id,
     )
+
+
+@app.post("/v1/chat/completions")
+async def chat_completions(request: OpenAIChatRequest) -> dict:
+    """
+    OpenAI-compatible chat completion endpoint.
+
+    Drop-in replacement for OpenAI's /v1/chat/completions.
+    Works with any OpenAI SDK by setting:
+        openai.api_base = "http://localhost:8000/v1"
+        openai.api_key = "any-value"  # Set AF_GATEWAY_API_KEY for real auth
+
+    This endpoint wraps the standard Sentinel pipeline:
+    1. Authenticate agent (via _agent_key in query or header)
+    2. Security checks (rate limit, prompt injection)
+    3. Budget enforcement (reserve → execute → settle)
+    4. Forward to provider
+    5. Trace and audit
+    6. Return OpenAI-format response
+    """
+    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry
+
+    if _budget_enforcer is None or _tracer is None:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    cfg = get_config()
+    step_id = str(uuid.uuid4())
+    start_time = time.monotonic()
+    task_id = request.user or str(uuid.uuid4())
+
+    # Step 1: Authenticate the agent
+    agent_key = request.user or ""
+    effective_agent_id = "default"
+    agent_budget_cap = cfg.default_budget_usd
+
+    if _agent_registry and agent_key:
+        agent = _agent_registry.authenticate(agent_key)
+        if agent is None:
+            raise HTTPException(status_code=401, detail="Invalid agent API key")
+        effective_agent_id = agent.agent_id
+        agent_budget_cap = agent.max_budget_usd
+
+    # Step 2: Rate limit
+    if _rate_limiter and cfg.gateway.rate_limit_enabled:
+        if not _rate_limiter.acquire(effective_agent_id):
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded for agent '{effective_agent_id}'.",
+            )
+
+    # Step 3: Input validation
+    input_text = request.estimated_input_text
+    if _sandbox:
+        injection_matches = InputValidator.check_prompt_injection(input_text)
+        if injection_matches:
+            raise HTTPException(status_code=400, detail="Prompt injection detected.")
+
+    # Step 4: Budget
+    existing_budget = _budget_enforcer.get_budget_config(task_id)
+    if existing_budget is None:
+        _budget_enforcer.init_task(task_id, agent_budget_cap)
+
+    estimated_cost = estimate_cost(
+        model=request.model,
+        input_text=input_text,
+        expected_output_tokens=request.max_tokens or 500,
+    )
+
+    can_execute = _budget_enforcer.check_and_reserve(task_id, estimated_cost)
+    if not can_execute:
+        raise HTTPException(status_code=402, detail="Budget exceeded.")
+
+    # Step 5: Forward to provider
+    output_text = ""
+    input_tokens = 0
+    output_tokens = 0
+    actual_cost = 0.0
+    status = "success"
+    error_msg = None
+
+    try:
+        if cfg.is_mock_mode:
+            output_text = (
+                f"[Sentinel Mock] Chat completion for model '{request.model}'. "
+                f"Set AF_MOCK_MODE=false and provide AF_PROVIDER_API_KEY to use a real provider."
+            )
+            input_tokens = count_tokens(input_text, request.model)
+            output_tokens = count_tokens(output_text, request.model)
+        else:
+            # Build OpenAI-format payload
+            payload: dict[str, Any] = {
+                "model": request.model,
+                "messages": [msg.model_dump(exclude_none=True) for msg in request.messages],
+            }
+            if request.max_tokens is not None:
+                payload["max_tokens"] = request.max_tokens
+            if request.temperature is not None:
+                payload["temperature"] = request.temperature
+            if request.top_p is not None:
+                payload["top_p"] = request.top_p
+            if request.n is not None:
+                payload["n"] = request.n
+            if request.stream is not None:
+                payload["stream"] = request.stream
+            if request.stop is not None:
+                payload["stop"] = request.stop
+            if request.presence_penalty is not None:
+                payload["presence_penalty"] = request.presence_penalty
+            if request.frequency_penalty is not None:
+                payload["frequency_penalty"] = request.frequency_penalty
+            if request.user is not None:
+                payload["user"] = request.user
+            if request.tools is not None:
+                payload["tools"] = [
+                    {"type": "function", "function": {"name": t.name, "description": t.description, "parameters": t.parameters}}
+                    for t in request.tools
+                ]
+            if request.tool_choice is not None:
+                if isinstance(request.tool_choice, str):
+                    payload["tool_choice"] = request.tool_choice
+                else:
+                    payload["tool_choice"] = request.tool_choice.model_dump(exclude_none=True)
+            if request.response_format is not None:
+                payload["response_format"] = request.response_format
+
+            headers = {"Content-Type": "application/json"}
+            if cfg.api_key:
+                headers["Authorization"] = f"Bearer {cfg.api_key}"
+
+            timeout = cfg.request_timeout_seconds
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    f"{cfg.provider_url}/chat/completions",
+                    json=payload,
+                    headers=headers,
+                )
+                response.raise_for_status()
+                response_data = response.json()
+                output_text = _extract_output_text(response_data)
+                input_tokens, output_tokens = _extract_token_usage(response_data)
+
+        # Settle budget
+        actual_cost = calculate_actual_cost(request.model, input_tokens, output_tokens)
+        remaining = _budget_enforcer.settle_actual(task_id, step_id, actual_cost)
+        if remaining <= 0:
+            status = "circuit_breaker"
+
+    except httpx.HTTPStatusError as e:
+        status = "error"
+        error_msg = f"Provider error: {e.response.status_code}"
+        output_text = error_msg
+        try:
+            _budget_enforcer.settle_actual(task_id, step_id, 0.0)
+        except CircuitBreakerException:
+            status = "circuit_breaker"
+    except httpx.RequestError as e:
+        status = "error"
+        error_msg = f"Request failed: {str(e)}"
+        output_text = error_msg
+        try:
+            _budget_enforcer.settle_actual(task_id, step_id, 0.0)
+        except CircuitBreakerException:
+            status = "circuit_breaker"
+    except Exception as e:
+        status = "error"
+        error_msg = f"Internal error: {str(e)}"
+        output_text = error_msg
+        try:
+            _budget_enforcer.settle_actual(task_id, step_id, 0.0)
+        except CircuitBreakerException:
+            status = "circuit_breaker"
+
+    # Step 6: Trace
+    elapsed_ms = (time.monotonic() - start_time) * 1000
+    trace_step = TraceStep(
+        step_id=step_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        tool_name="llm.chat",
+        model=request.model,
+        input_preview=_truncate(input_text),
+        output_preview=_truncate(output_text),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=actual_cost if 'actual_cost' in dir() else 0.0,
+        latency_ms=round(elapsed_ms, 2),
+        status=status,
+        error=error_msg,
+    )
+    _tracer.log_step(task_id, trace_step)
+
+    # Audit
+    if _audit and status == "success":
+        _audit.log(
+            SecurityEventType.TOOL_CALL_ALLOWED,
+            agent_id=effective_agent_id,
+            task_id=task_id,
+            details={"tool": "llm.chat", "cost_usd": actual_cost if 'actual_cost' in dir() else 0.0},
+            risk_level=RiskLevel.LOW,
+        )
+
+    # Return OpenAI-format response
+    return OpenAIChatResponse(
+        id=f"chatcmpl-{step_id[:29]}",
+        created=int(time.time()),
+        model=request.model,
+        choices=[{
+            "index": 0,
+            "message": {"role": "assistant", "content": output_text},
+            "finish_reason": "stop" if status == "success" else "error",
+        }],
+        usage={
+            "prompt_tokens": input_tokens,
+            "completion_tokens": output_tokens,
+            "total_tokens": input_tokens + output_tokens,
+        },
+    ).model_dump()
 
 
 @app.get("/v1/tasks")
@@ -747,7 +961,7 @@ async def get_audit_log(
     if _audit is None:
         raise HTTPException(status_code=503, detail="Audit system not initialized")
 
-    from agentfence.security import RiskLevel
+    from sentinel.security import RiskLevel
 
     risk = None
     if risk_level:

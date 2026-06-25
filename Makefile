@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentFence — Makefile
+# Sentinel — Makefile
 # =============================================================================
 # Common development and deployment commands.
 #
@@ -31,7 +31,7 @@ endif
 # Help
 # =============================================================================
 help: ## Show this help message
-	@echo "AgentFence — Available commands:"
+	@echo "Sentinel — Available commands:"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -51,19 +51,19 @@ install: ## Install all dependencies (production + dev)
 # =============================================================================
 test: ## Run tests with coverage report
 	@echo "Running tests..."
-	$(PYTHON) -m pytest -v --cov=agentfence --cov-report=term-missing --cov-report=html:htmlcov
+	$(PYTHON) -m pytest -v --cov=sentinel --cov-report=term-missing --cov-report=html:htmlcov
 	@echo "Coverage report: htmlcov/index.html"
 
 # =============================================================================
 # Running
 # =============================================================================
 run: ## Start the gateway server
-	@echo "Starting AgentFence gateway on http://0.0.0.0:8000..."
-	uvicorn agentfence.gateway:app --host 0.0.0.0 --port 8000 --reload
+	@echo "Starting Sentinel gateway on http://0.0.0.0:8000..."
+	uvicorn sentinel.gateway:app --host 0.0.0.0 --port 8000 --reload
 
 dashboard: ## Start the Streamlit dashboard
-	@echo "Starting AgentFence dashboard on http://localhost:8501..."
-	streamlit run agentfence/dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+	@echo "Starting Sentinel dashboard on http://localhost:8501..."
+	streamlit run sentinel/dashboard/app.py --server.port 8501 --server.address 0.0.0.0
 
 # =============================================================================
 # Docker
@@ -74,14 +74,14 @@ docker-build: ## Build Docker images
 	@echo "Done."
 
 docker-up: ## Start full stack with Docker Compose
-	@echo "Starting AgentFence stack..."
+	@echo "Starting Sentinel stack..."
 	docker compose up -d
 	@echo "Gateway:    http://localhost:8000"
 	@echo "Dashboard:  http://localhost:8501"
 	@echo "Redis:      localhost:6379"
 
 docker-down: ## Stop Docker Compose stack
-	@echo "Stopping AgentFence stack..."
+	@echo "Stopping Sentinel stack..."
 	docker compose down
 	@echo "Done."
 
@@ -93,12 +93,12 @@ docker-logs: ## Show Docker Compose logs
 # =============================================================================
 lint: ## Run linter (ruff)
 	@echo "Running ruff..."
-	ruff check agentfence/ tests/
+	ruff check sentinel/ tests/
 
 format: ## Auto-format code (ruff)
 	@echo "Formatting with ruff..."
-	ruff format agentfence/ tests/
-	ruff check --fix agentfence/ tests/
+	ruff format sentinel/ tests/
+	ruff check --fix sentinel/ tests/
 
 # =============================================================================
 # Cleanup

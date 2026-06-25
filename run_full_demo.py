@@ -6,14 +6,14 @@ import os
 import signal
 
 PYTHON = r"C:\Users\rehan\AppData\Local\Programs\Python\Python314\python.exe"
-PROJECT = r"C:\Users\rehan\agentfence"
+PROJECT = r"C:\Users\rehan\sentinel"
 
 # Start gateway in background
 print("=" * 60)
-print("Starting AgentFence Gateway...")
+print("Starting Sentinel Gateway...")
 print("=" * 60)
 gateway = subprocess.Popen(
-    [PYTHON, "-m", "uvicorn", "agentfence.gateway:app", "--port", "8000", "--host", "127.0.0.1"],
+    [PYTHON, "-m", "uvicorn", "sentinel.gateway:app", "--port", "8000", "--host", "127.0.0.1"],
     cwd=PROJECT,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,

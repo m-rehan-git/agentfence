@@ -1,7 +1,7 @@
 """
-Runaway Agent - Demo script showing AgentFence tracking a looping agent.
+Runaway Agent - Demo script showing Sentinel tracking a looping agent.
 
-This script demonstrates AgentFence's execution tracing by:
+This script demonstrates Sentinel's execution tracing by:
 1. Setting a $0.20 budget.
 2. Using the local/ollama/llama3 model (free tier, $0 cost per call).
 3. Running a loop of 5 tool calls that all succeed (since model is free).
@@ -9,16 +9,16 @@ This script demonstrates AgentFence's execution tracing by:
 
 Since the local model has $0 cost in pricing.json, the budget never depletes
 and all calls succeed. The "runaway" aspect is that the agent keeps calling
-in a loop, but AgentFence tracks every step. With a paid model (e.g.,
+in a loop, but Sentinel tracks every step. With a paid model (e.g.,
 gpt-3.5-turbo), the budget would be enforced and the circuit breaker would
 trip once funds are exhausted.
 
 Usage:
-    cd C:\\Users\\rehan\\agentfence
+    cd C:\\Users\\rehan\\sentinel
     python -m examples.runaway_agent
 
 Make sure the gateway is running:
-    python -m uvicorn agentfence.gateway:app --port 8000
+    python -m uvicorn sentinel.gateway:app --port 8000
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def execute_tool(
     max_output_tokens: int = 500,
 ) -> dict:
     """
-    Send a tool execution request to the AgentFence gateway.
+    Send a tool execution request to the Sentinel gateway.
 
     Args:
         client: The httpx client.
@@ -79,9 +79,9 @@ def get_remaining_budget(client: httpx.Client) -> float:
 
 
 def main() -> None:
-    """Run the runaway agent loop and show AgentFence tracking."""
+    """Run the runaway agent loop and show Sentinel tracking."""
     print("=" * 60)
-    print("🔥 Runaway Agent - AgentFence Tracking Demo (Offline)")
+    print("🔥 Runaway Agent - Sentinel Tracking Demo (Offline)")
     print("=" * 60)
     print(f"Task ID : {TASK_ID}")
     print(f"Budget  : ${BUDGET_USD:.2f}")
@@ -91,7 +91,7 @@ def main() -> None:
     print()
     print("NOTE: This agent loops 5 times. Since the model is free,")
     print("all calls succeed and the budget is never depleted.")
-    print("With a paid model, AgentFence would enforce the budget")
+    print("With a paid model, Sentinel would enforce the budget")
     print("and trip the circuit breaker once funds run out.")
     print()
 
@@ -130,7 +130,7 @@ def main() -> None:
             print(f"   Time     : {result['execution_time_ms']:.0f}ms")
 
             if result["status"] in ("budget_exceeded", "circuit_breaker"):
-                print(f"\n🛑 AgentFence stopped the agent: {result['status']}")
+                print(f"\n🛑 Sentinel stopped the agent: {result['status']}")
                 break
 
             if result["status"] == "error":
@@ -178,7 +178,7 @@ so all 5 iterations succeeded without depleting the $0.20 budget.
 With a paid model (e.g., 'gpt-3.5-turbo' at $0.0005/1K input tokens):
   - Each call would cost ~$0.001-$0.01 depending on input size.
   - After ~20-50 calls, the $0.20 budget would be exhausted.
-  - AgentFence would then:
+  - Sentinel would then:
       1. Reserve budget before each call (check_and_reserve).
       2. If estimated cost > remaining budget → 'budget_exceeded'.
       3. If actual cost pushes remaining below $0 → 'circuit_breaker'.

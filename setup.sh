@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AgentFence — One-Click Linux / macOS Setup Script
+# Sentinel — One-Click Linux / macOS Setup Script
 # =============================================================================
 # Usage:
 #   chmod +x setup.sh
@@ -79,7 +79,7 @@ VENV_PIP=".venv/bin/pip"
 echo "  Upgrading pip..."
 "$VENV_PYTHON" -m pip install --upgrade pip setuptools wheel >/dev/null 2>&1
 
-echo "  Installing agentfence with dev dependencies..."
+echo "  Installing sentinel with dev dependencies..."
 "$VENV_PIP" install -e ".[dev]"
 
 if [ $? -ne 0 ]; then
@@ -130,14 +130,14 @@ ok "All tests passed."
 # ---------------------------------------------------------------------------
 echo ""
 echo -e "${GREEN}=============================================${NC}"
-echo -e "${GREEN}  AgentFence setup complete!${NC}"
+echo -e "${GREEN}  Sentinel setup complete!${NC}"
 echo -e "${GREEN}=============================================${NC}"
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "  1. Edit .env to configure your API key and settings"
-echo "  2. Start the gateway:  python -m agentfence.gateway"
-echo "     or:                  agentfence-gateway"
-echo "  3. Start the dashboard: agentfence-dashboard"
-echo "     or:                  streamlit run agentfence/dashboard/app.py"
+echo "  2. Start the gateway:  python -m sentinel.gateway"
+echo "     or:                  sentinel-gateway"
+echo "  3. Start the dashboard: sentinel-dashboard"
+echo "     or:                  streamlit run sentinel/dashboard/app.py"
 echo "  4. Visit http://localhost:8501 for the dashboard"
 echo ""

@@ -1,5 +1,5 @@
 """
-AgentFence Dashboard - Streamlit single-page application.
+Sentinel Dashboard - Streamlit single-page application.
 
 This dashboard provides a visual interface for:
 - Viewing all tasks and their budget status.
@@ -23,7 +23,7 @@ API_BASE = st.sidebar.text_input("Gateway URL", value="http://localhost:8000")
 
 
 def api_get(path: str) -> Optional[Any]:
-    """Make a GET request to the AgentFence gateway."""
+    """Make a GET request to the Sentinel gateway."""
     try:
         response = httpx.get(f"{API_BASE}{path}", timeout=10.0)
         response.raise_for_status()
@@ -34,7 +34,7 @@ def api_get(path: str) -> Optional[Any]:
 
 
 def api_post(path: str, json_body: Optional[dict] = None) -> Optional[Any]:
-    """Make a POST request to the AgentFence gateway."""
+    """Make a POST request to the Sentinel gateway."""
     try:
         response = httpx.post(f"{API_BASE}{path}", json=json_body or {}, timeout=10.0)
         response.raise_for_status()
@@ -45,12 +45,12 @@ def api_post(path: str, json_body: Optional[dict] = None) -> Optional[Any]:
 
 
 st.set_page_config(
-    page_title="AgentFence Dashboard",
+    page_title="Sentinel Dashboard",
     page_icon="🛡️",
     layout="wide",
 )
 
-st.title("🛡️ AgentFence Dashboard")
+st.title("🛡️ Sentinel Dashboard")
 st.markdown("*Cost control, execution monitoring, and failure replay for AI agents.*")
 
 # Sidebar - Task selector
@@ -236,4 +236,4 @@ if current_state and trace_data:
             st.error(f"Error: {step['error']}")
 
 st.markdown("---")
-st.caption("AgentFence v0.1.0 - Built for AI agent cost control and observability.")
+st.caption("Sentinel v0.2.0 - Built for AI agent cost control and observability.")

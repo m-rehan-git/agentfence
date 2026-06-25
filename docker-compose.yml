@@ -1,5 +1,5 @@
 # =============================================================================
-# AgentFence — Full Stack Docker Compose
+# Sentinel — Full Stack Docker Compose
 # =============================================================================
 # Usage:
 #   docker compose up -d          # start full stack
@@ -17,17 +17,17 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agentfence-gateway
+    container_name: sentinel-gateway
     ports:
       - "${AF_GATEWAY_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
-      - AF_DATABASE_URL=sqlite+aiosqlite:///./data/agentfence.db
+      - AF_DATABASE_URL=sqlite+aiosqlite:///./data/sentinel.db
       - AF_TRACES_DIR=/app/traces
     volumes:
-      - agentfence-data:/app/data
-      - agentfence-traces:/app/traces
+      - sentinel-data:/app/data
+      - sentinel-traces:/app/traces
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -36,7 +36,7 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - agentfence-net
+      - sentinel-net
     depends_on:
       redis:
         condition: service_started
@@ -48,9 +48,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agentfence-dashboard
+    container_name: sentinel-dashboard
     command: >
-      streamlit run agentfence/dashboard/app.py
+      streamlit run sentinel/dashboard/app.py
       --server.port ${AF_DASHBOARD_PORT:-8501}
       --server.address 0.0.0.0
       --server.headless true
@@ -62,7 +62,7 @@ services:
       - AF_GATEWAY_URL=http://gateway:8000
     restart: unless-stopped
     networks:
-      - agentfence-net
+      - sentinel-net
     depends_on:
       gateway:
         condition: service_healthy
@@ -72,11 +72,11 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: agentfence-redis
+    container_name: sentinel-redis
     ports:
       - "6379:6379"
     volumes:
-      - agentfence-redis:/data
+      - sentinel-redis:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -84,22 +84,22 @@ services:
       timeout: 3s
       retries: 3
     networks:
-      - agentfence-net
+      - sentinel-net
 
 # ---------------------------------------------------------------------------
 # Networks
 # ---------------------------------------------------------------------------
 networks:
-  agentfence-net:
+  sentinel-net:
     driver: bridge
 
 # ---------------------------------------------------------------------------
 # Volumes
 # ---------------------------------------------------------------------------
 volumes:
-  agentfence-data:
+  sentinel-data:
     driver: local
-  agentfence-traces:
+  sentinel-traces:
     driver: local
-  agentfence-redis:
+  sentinel-redis:
     driver: local

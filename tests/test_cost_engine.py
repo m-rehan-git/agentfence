@@ -18,14 +18,12 @@ Run with: pytest tests/test_cost_engine.py -v
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from agentfence.cost_engine import (
-    _count_tokens_heuristic,
+from sentinel.cost_engine import (
     _is_openai_model,
     _load_pricing,
     calculate_actual_cost,
@@ -42,7 +40,7 @@ from agentfence.cost_engine import (
 @pytest.fixture
 def reset_pricing_cache() -> None:
     """Reset the in-memory pricing cache before a test."""
-    import agentfence.cost_engine as ce
+    import sentinel.cost_engine as ce
     ce._pricing_cache = None
     ce._pricing_cache_ts = 0.0
     yield
@@ -84,7 +82,7 @@ class TestEstimateCostOpenaiModels:
         }
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -99,7 +97,7 @@ class TestEstimateCostOpenaiModels:
         }
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -114,7 +112,7 @@ class TestEstimateCostOpenaiModels:
         }
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -131,7 +129,7 @@ class TestEstimateCostOpenaiModels:
         }
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -203,7 +201,7 @@ class TestCalculateActualCost:
         # gpt-4o: $0.005/1K input, $0.015/1K output
         # 1000 input tokens = $0.005, 500 output tokens = $0.0075
         # Total = $0.0125
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             from pathlib import Path
             pricing_data = {
                 "models": {
@@ -282,7 +280,7 @@ class TestPricingCache:
         }
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -302,7 +300,7 @@ class TestPricingCache:
         }
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -323,7 +321,7 @@ class TestMissingPricingFile:
     def test_missing_pricing_file_graceful(self, tmp_path: Path, reset_pricing_cache: None) -> None:
         """Missing pricing file should not crash — returns empty pricing."""
         fake_path = tmp_path / "nonexistent_pricing.json"
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = fake_path
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}
@@ -347,7 +345,7 @@ class TestCustomPricingOverride:
         custom = {
             "my-custom-model": {"input_per_1k": 0.001, "output_per_1k": 0.003}
         }
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = custom
@@ -361,7 +359,7 @@ class TestCustomPricingOverride:
         pricing_data = {"models": {}}
         f = tmp_path / "pricing.json"
         f.write_text(json.dumps(pricing_data), encoding="utf-8")
-        with patch("agentfence.cost_engine.get_config") as mock_cfg:
+        with patch("sentinel.cost_engine.get_config") as mock_cfg:
             mock_cfg.return_value.budget.pricing_path = f
             mock_cfg.return_value.budget.pricing_cache_ttl_sec = 300
             mock_cfg.return_value.budget.custom_pricing_overrides = {}

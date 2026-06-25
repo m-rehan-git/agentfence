@@ -1,19 +1,18 @@
 """
-Centralized configuration management for AgentFence.
+Centralized configuration management for Sentinel.
 
 All settings are loaded from environment variables with the AF_ prefix.
 A .env file is loaded at startup if present. Sensible defaults are provided
 for every setting so the system works out of the box in development.
 
 Usage:
-    from agentfence.config import get_config
+    from sentinel.config import get_config
     cfg = get_config()
     print(cfg.database_url)
 """
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -23,7 +22,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 # ---------------------------------------------------------------------------
-# Helper: locate project root (parent of agentfence/ package)
+# Helper: locate project root (parent of sentinel/ package)
 # ---------------------------------------------------------------------------
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -34,7 +33,7 @@ class DatabaseSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AF_DB_")
 
     url: str = Field(
-        default="sqlite:///agentfence.db",
+        default="sqlite:///sentinel.db",
         description="Database URL. Supports sqlite:///path or postgresql://...",
     )
     pool_size: int = Field(
@@ -116,6 +115,12 @@ class GatewaySettings(BaseSettings):
         ge=1024,
         le=104_857_600,  # 100 MB
         description="Maximum request body size in bytes.",
+    )
+
+
+    api_key: str = Field(
+        default="",
+        description="Gateway API key for bearer token authentication. If empty, auth is disabled (not recommended for production).",
     )
 
 

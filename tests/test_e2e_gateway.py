@@ -1,7 +1,5 @@
-"""Quick end-to-end test of the AgentFence gateway."""
+"""Quick end-to-end test of the Sentinel gateway."""
 import httpx
-import json
-import time
 
 BASE = "http://127.0.0.1:8000"
 

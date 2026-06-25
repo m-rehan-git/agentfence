@@ -1,16 +1,16 @@
 """
-AgentFence CLI — Command-line interface for managing AgentFence.
+Sentinel CLI — Command-line interface for managing Sentinel.
 
 Usage:
-    agentfence start          # Start the gateway
-    agentfence dashboard      # Start the dashboard
-    agentfence status         # Check gateway health
-    agentfence agents list    # List registered agents
-    agentfence agents add     # Register a new agent
-    agentfence audit          # View security audit log
-    agentfence audit verify   # Verify audit chain integrity
-    agentfence sandbox list   # List tool sandbox policies
-    agentfence version        # Show version info
+    sentinel start          # Start the gateway
+    sentinel dashboard      # Start the dashboard
+    sentinel status         # Check gateway health
+    sentinel agents list    # List registered agents
+    sentinel agents add     # Register a new agent
+    sentinel audit          # View security audit log
+    sentinel audit verify   # Verify audit chain integrity
+    sentinel sandbox list   # List tool sandbox policies
+    sentinel version        # Show version info
 """
 
 from __future__ import annotations
@@ -18,29 +18,28 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import time
 from pathlib import Path
 from typing import Optional
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 
 def _get_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        prog="agentfence",
-        description="AgentFence — Security-aware infrastructure for AI agents",
+        prog="sentinel",
+        description="Sentinel — Security-aware infrastructure for AI agents",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Examples:\n  agentfence start              # Start gateway\n  agentfence dashboard          # Start dashboard\n  agentfence audit --verify     # Verify audit chain\n  agentfence sandbox --list     # List tool policies\n",
+        epilog="Examples:\n  sentinel start              # Start gateway\n  sentinel dashboard          # Start dashboard\n  sentinel audit --verify     # Verify audit chain\n  sentinel sandbox --list     # List tool policies\n",
     )
 
-    parser.add_argument("--version", action="version", version=f"AgentFence v{__version__}")
+    parser.add_argument("--version", action="version", version=f"Sentinel v{__version__}")
     parser.add_argument("--config", type=str, default=None, help="Path to .env config file")
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # --- start ---
-    start_parser = subparsers.add_parser("start", help="Start the AgentFence gateway")
+    start_parser = subparsers.add_parser("start", help="Start the Sentinel gateway")
     start_parser.add_argument("--host", type=str, default="0.0.0.0", help="Bind host")
     start_parser.add_argument("--port", type=int, default=8000, help="Bind port")
     start_parser.add_argument("--reload", action="store_true", help="Enable auto-reload")
@@ -84,7 +83,7 @@ def _get_parser() -> argparse.ArgumentParser:
     sandbox_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # --- init ---
-    init_parser = subparsers.add_parser("init", help="Initialize a new AgentFence project")
+    init_parser = subparsers.add_parser("init", help="Initialize a new Sentinel project")
     init_parser.add_argument("--path", type=str, default=".", help="Project directory")
 
     # --- deploy ---
@@ -103,14 +102,14 @@ def cmd_start(args: argparse.Namespace) -> None:
     """Start the gateway server."""
     import uvicorn
 
-    print(f"🛡️  AgentFence v{__version__} — Starting gateway...")
+    print(f"🛡️  Sentinel v{__version__} — Starting gateway...")
     print(f"   Host: {args.host}:{args.port}")
     print(f"   Workers: {args.workers}")
     print(f"   Docs: http://{args.host}:{args.port}/docs")
     print()
 
     uvicorn.run(
-        "agentfence.gateway:app",
+        "sentinel.gateway:app",
         host=args.host,
         port=args.port,
         reload=args.reload,
@@ -123,7 +122,7 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
     """Start the Streamlit dashboard."""
     import subprocess
 
-    print(f"🛡️  AgentFence v{__version__} — Starting dashboard on port {args.port}...")
+    print(f"🛡️  Sentinel v{__version__} — Starting dashboard on port {args.port}...")
     subprocess.run(
         [
             sys.executable, "-m", "streamlit", "run",
@@ -143,7 +142,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     try:
         req = urllib.request.urlopen("http://localhost:8000/health", timeout=5)
         data = json.loads(req.read().decode())
-        print(f"🛡️  AgentFence Status")
+        print("🛡️  Sentinel Status")
         print(f"   Status:    {data.get('status', 'unknown')}")
         print(f"   Version:   {data.get('version', 'unknown')}")
         print(f"   Uptime:    {data.get('uptime_seconds', 0):.1f}s")
@@ -159,7 +158,7 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 def cmd_agents_list(args: argparse.Namespace) -> None:
     """List registered agents."""
-    from agentfence.agent_registry import AgentRegistry
+    from sentinel.agent_registry import AgentRegistry
 
     registry = AgentRegistry()
     agents = registry.list_agents()
@@ -183,7 +182,7 @@ def cmd_agents_list(args: argparse.Namespace) -> None:
 
 def cmd_agents_add(args: argparse.Namespace) -> None:
     """Register a new agent."""
-    from agentfence.agent_registry import AgentRegistry
+    from sentinel.agent_registry import AgentRegistry
 
     registry = AgentRegistry()
     identity, raw_key = registry.create_agent(
@@ -195,14 +194,14 @@ def cmd_agents_add(args: argparse.Namespace) -> None:
     print(f"✅ Agent '{args.agent_id}' registered successfully")
     print(f"   Budget: ${args.budget:.2f}")
     print(f"   RPM:    {args.rpm}")
-    print(f"")
-    print(f"   🔑 API Key (save this — it won't be shown again):")
+    print("")
+    print("   🔑 API Key (save this — it won't be shown again):")
     print(f"   {raw_key}")
 
 
 def cmd_agents_remove(args: argparse.Namespace) -> None:
     """Remove an agent."""
-    from agentfence.agent_registry import AgentRegistry
+    from sentinel.agent_registry import AgentRegistry
 
     registry = AgentRegistry()
     if registry.delete_agent(args.agent_id):
@@ -213,7 +212,7 @@ def cmd_agents_remove(args: argparse.Namespace) -> None:
 
 def cmd_audit(args: argparse.Namespace) -> None:
     """View security audit log."""
-    from agentfence.security import AuditLogger, RiskLevel
+    from sentinel.security import AuditLogger, RiskLevel
 
     audit = AuditLogger()
 
@@ -267,7 +266,7 @@ def cmd_audit(args: argparse.Namespace) -> None:
 
 def cmd_sandbox(args: argparse.Namespace) -> None:
     """List tool sandbox policies."""
-    from agentfence.security import ToolSandbox
+    from sentinel.security import ToolSandbox
 
     sandbox = ToolSandbox()
     policies = sandbox.list_policies()
@@ -296,7 +295,7 @@ def cmd_sandbox(args: argparse.Namespace) -> None:
 
 
 def cmd_init(args: argparse.Namespace) -> None:
-    """Initialize a new AgentFence project."""
+    """Initialize a new Sentinel project."""
     project_path = Path(args.path)
     project_path.mkdir(parents=True, exist_ok=True)
 
@@ -304,7 +303,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     env_example = project_path / ".env.example"
     if not env_example.exists():
         env_example.write_text(
-            "# AgentFence Configuration\n"
+            "# Sentinel Configuration\n"
             "AF_API_KEY=your-api-key-here\n"
             "AF_MOCK_MODE=true\n"
             "AF_LOG_LEVEL=INFO\n"
@@ -312,11 +311,11 @@ def cmd_init(args: argparse.Namespace) -> None:
             encoding="utf-8",
         )
 
-    # Create agentfence.yaml config
-    config_file = project_path / "agentfence.yaml"
+    # Create sentinel.yaml config
+    config_file = project_path / "sentinel.yaml"
     if not config_file.exists():
         config_file.write_text(
-            "# AgentFence Project Configuration\n"
+            "# Sentinel Project Configuration\n"
             "gateway:\n"
             "  host: 0.0.0.0\n"
             "  port: 8000\n"
@@ -328,9 +327,9 @@ def cmd_init(args: argparse.Namespace) -> None:
             encoding="utf-8",
         )
 
-    print(f"✅ AgentFence project initialized at {project_path}")
+    print(f"✅ Sentinel project initialized at {project_path}")
     print(f"   Edit {config_file.name} to configure")
-    print(f"   Run 'agentfence start' to begin")
+    print("   Run 'sentinel start' to begin")
 
 
 def cmd_deploy_docker(args: argparse.Namespace) -> None:
@@ -341,11 +340,11 @@ def cmd_deploy_docker(args: argparse.Namespace) -> None:
     if args.detach:
         cmd.append("-d")
 
-    print("🛡️  Deploying AgentFence with Docker Compose...")
+    print("🛡️  Deploying Sentinel with Docker Compose...")
     subprocess.run(cmd, check=True)
 
     if args.detach:
-        print("✅ AgentFence running in background")
+        print("✅ Sentinel running in background")
         print("   Gateway:   http://localhost:8000")
         print("   Dashboard: http://localhost:8501")
         print("   Logs:      docker compose logs -f")

@@ -3,14 +3,14 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "agentfence"
-version = "0.2.0"
-description = "AgentFence — guardrails, budget enforcement, and observability for AI agent workloads"
+name = "sentinel"
+version = "0.3.0"
+description = "Sentinel — guardrails, budget enforcement, and observability for AI agent workloads"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [
-    { name = "AgentFence Team", email = "team@agentfence.dev" },
+    { name = "Sentinel Team", email = "team@sentinel.dev" },
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -33,11 +33,14 @@ dependencies = [
     "pydantic-settings>=2.2",
     "httpx>=0.27",
     "aiosqlite>=0.20",
-    "streamlit>=1.35",
     "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
+dashboard = [
+    "streamlit>=1.35",
+    "pandas>=2.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -47,16 +50,20 @@ dev = [
 ]
 
 [project.scripts]
-agentfence = "agentfence.cli:main"
-agentfence-gateway = "agentfence.gateway:main"
-agentfence-dashboard = "agentfence.dashboard:main"
+sentinel = "sentinel.cli:main"
+sentinel-gateway = "sentinel.gateway:main"
+sentinel-dashboard = "sentinel.dashboard:main"
 
 [tool.setuptools.packages.find]
-include = ["agentfence*"]
+include = ["sentinel*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = ["-v"]
 
+[tool.ruff]
+line-length = 120
 
+[tool.ruff.lint]
+ignore = ["F821", "F841"]

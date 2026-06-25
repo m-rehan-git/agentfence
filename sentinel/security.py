@@ -1,7 +1,7 @@
 """
 Security Layer - Tool call sandboxing, input validation, and audit logging.
 
-This module provides the security backbone for AgentFence:
+This module provides the security backbone for Sentinel:
   - ToolSandbox    : Whitelist/blacklist tool calls, enforce parameter constraints
   - RateLimiter    : Token-bucket rate limiter (per-agent, per-tool, global)
   - AuditLogger    : Append-only security event log (tamper-evident)
@@ -17,7 +17,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import re
 import sqlite3
 import threading
@@ -29,7 +28,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
-from agentfence.config import get_config
+from sentinel.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -561,7 +560,7 @@ class AuditLogger:
     chain and is detectable.
 
     Writes to:
-      - SQLite (agentfence.db, audit_events table) — queryable
+      - SQLite (sentinel.db, audit_events table) — queryable
       - audit.jsonl (append-only file) — forensic backup
 
     Usage:
@@ -587,7 +586,7 @@ class AuditLogger:
             if db_url.startswith("sqlite:///"):
                 self._db_path = Path(db_url.replace("sqlite:///", ""))
             else:
-                self._db_path = Path("agentfence.db")
+                self._db_path = Path("sentinel.db")
 
         self._audit_file = audit_file or (self._db_path.parent / "audit.jsonl")
         self._lock = threading.Lock()

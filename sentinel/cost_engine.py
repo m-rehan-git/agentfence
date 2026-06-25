@@ -21,8 +21,8 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from agentfence.config import get_config
-from agentfence.logging import get_logger
+from sentinel.config import get_config
+from sentinel.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -119,6 +119,57 @@ def invalidate_pricing_cache() -> None:
 # Model pricing lookup
 # ---------------------------------------------------------------------------
 
+def _resolve_model_entry(model: str) -> Optional[dict[str, Any]]:
+    """
+    Resolve a model name to its pricing entry, supporting wildcard matches.
+
+    Tries exact match first, then provider-prefix wildcards (e.g., "local/*"),
+    then pattern-based matching for common prefixes.
+
+    Args:
+        model: Model identifier (e.g., "gpt-4o", "local/ollama/llama3").
+
+    Returns:
+        The pricing entry dict, or None if no match found.
+    """
+    pricing = _load_pricing()
+
+    # 1. Exact match
+    if model in pricing:
+        return pricing[model]
+
+    # 2. Wildcard matches: check "provider/*" patterns
+    if model.startswith("local/"):
+        # Check generic local wildcard first
+        if "local/*" in pricing:
+            return pricing["local/*"]
+        # Check for other wildcard patterns in the pricing keys
+        for key, entry in pricing.items():
+            if key.endswith("/*"):
+                prefix = key[:-1]  # e.g., "local/"
+                if model.startswith(prefix):
+                    return entry
+
+    # 3. Provider-prefix fallback: try matching by known provider prefixes
+    provider_prefixes = {
+        "gpt": "openai",
+        "claude": "anthropic",
+        "gemini": "google",
+        "mistral": "mistral",
+        "mixtral": "mistral",
+        "codestral": "mistral",
+        "command": "cohere",
+    }
+    for prefix_key, provider_name in provider_prefixes.items():
+        if model.startswith(prefix_key):
+            # Try provider/* wildcard
+            wildcard = f"{provider_name}/*"
+            if wildcard in pricing:
+                return pricing[wildcard]
+
+    return None
+
+
 def _get_model_pricing(model: str) -> tuple[float, float]:
     """
     Look up input and output pricing for a given model string.
@@ -130,12 +181,50 @@ def _get_model_pricing(model: str) -> tuple[float, float]:
         Tuple of (input_price_per_1k, output_price_per_1k) in USD.
         Falls back to (0.0, 0.0) for unknown models (free tier).
     """
-    pricing = _load_pricing()
-    if model in pricing:
-        entry = pricing[model]
+    entry = _resolve_model_entry(model)
+    if entry is not None:
         return float(entry["input_per_1k"]), float(entry["output_per_1k"])
     # Fallback: treat unknown models as free (local/self-hosted)
     return 0.0, 0.0
+
+
+def get_model_provider(model: str) -> str:
+    """
+    Get the provider name for a given model.
+
+    Args:
+        model: Model identifier.
+
+    Returns:
+        Provider string (e.g., "openai", "anthropic", "google", "local").
+        Falls back to "unknown" for unrecognized models.
+    """
+    entry = _resolve_model_entry(model)
+    if entry is not None:
+        return entry.get("provider", "unknown")
+    if model.startswith("local/"):
+        return "local"
+    return "unknown"
+
+
+def get_model_limits(model: str) -> tuple[int, int]:
+    """
+    Get the maximum context and output token limits for a given model.
+
+    Args:
+        model: Model identifier.
+
+    Returns:
+        Tuple of (max_context_tokens, max_output_tokens).
+        Falls back to (8192, 4096) for unknown models.
+    """
+    entry = _resolve_model_entry(model)
+    if entry is not None:
+        return (
+            int(entry.get("max_context_tokens", 8192)),
+            int(entry.get("max_output_tokens", 4096)),
+        )
+    return 8192, 4096
 
 
 # ---------------------------------------------------------------------------

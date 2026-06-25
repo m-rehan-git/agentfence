@@ -1,34 +1,34 @@
 """
-AgentFence - Security-aware AI agent infrastructure.
+Sentinel - Security-aware AI agent infrastructure.
 
 Cost control, execution monitoring, failure replay, and security guardrails
 for AI agents. Runs locally for privacy. No cloud dependency.
 
 Usage:
-    from agentfence import get_config, BudgetEnforcer, Tracer
-    from agentfence.security import ToolSandbox, AuditLogger, RateLimiter
+    from sentinel import get_config, BudgetEnforcer, Tracer
+    from sentinel.security import ToolSandbox, AuditLogger, RateLimiter
 
 CLI:
-    agentfence start          # Start the gateway
-    agentfence dashboard      # Start the dashboard
-    agentfence status         # Check health
-    agentfence audit          # View security log
-    agentfence sandbox --list # List tool policies
+    sentinel start          # Start the gateway
+    sentinel dashboard      # Start the dashboard
+    sentinel status         # Check health
+    sentinel audit          # View security log
+    sentinel sandbox --list # List tool policies
 """
 
-from agentfence.models import (
+from sentinel.models import (
     BudgetConfig,
     CircuitBreakerException,
     ToolRequest,
     ToolResponse,
     TraceStep,
 )
-from agentfence.config import get_config
-from agentfence.budget_enforcer import BudgetEnforcer
-from agentfence.tracer import Tracer
-from agentfence.replay import ReplayEngine
-from agentfence.cost_engine import estimate_cost, calculate_actual_cost, count_tokens
-from agentfence.security import (
+from sentinel.config import get_config
+from sentinel.budget_enforcer import BudgetEnforcer
+from sentinel.tracer import Tracer
+from sentinel.replay import ReplayEngine
+from sentinel.cost_engine import estimate_cost, calculate_actual_cost, count_tokens
+from sentinel.security import (
     ToolSandbox,
     RateLimiter,
     AuditLogger,
@@ -38,7 +38,7 @@ from agentfence.security import (
     SecurityEventType,
     RiskLevel,
 )
-from agentfence.agent_registry import AgentRegistry, AgentIdentity
+from sentinel.agent_registry import AgentRegistry, AgentIdentity
 
 __version__ = "0.2.0"
 

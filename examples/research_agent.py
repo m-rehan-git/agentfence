@@ -1,5 +1,5 @@
 """
-Research Agent - Demo script showing a 3-step agent using AgentFence.
+Research Agent - Demo script showing a 3-step agent using Sentinel.
 
 This script simulates a research agent that:
 1. Searches for information on a topic.
@@ -11,11 +11,11 @@ so the budget never depletes. Combined with AGENTFENCE_MOCK_MODE=1 (or no
 API key), this runs completely offline with no external API calls.
 
 Usage:
-    cd C:\\Users\\rehan\\agentfence
+    cd C:\\Users\\rehan\\sentinel
     python -m examples.research_agent
 
 Make sure the gateway is running:
-    python -m uvicorn agentfence.gateway:app --port 8000
+    python -m uvicorn sentinel.gateway:app --port 8000
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def execute_tool(
     max_output_tokens: int = 500,
 ) -> dict:
     """
-    Send a tool execution request to the AgentFence gateway.
+    Send a tool execution request to the Sentinel gateway.
 
     Args:
         client: The httpx client.
@@ -78,7 +78,7 @@ def get_remaining_budget(client: httpx.Client) -> float:
 def main() -> None:
     """Run the multi-step research agent."""
     print("=" * 60)
-    print("🔬 Research Agent - AgentFence Demo (Offline Mode)")
+    print("🔬 Research Agent - Sentinel Demo (Offline Mode)")
     print("=" * 60)
     print(f"Task ID : {TASK_ID}")
     print(f"Budget  : ${BUDGET_USD:.2f}")

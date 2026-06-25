@@ -1,1 +1,1 @@
-"""Example scripts demonstrating AgentFence usage."""
+"""Example scripts demonstrating Sentinel usage."""

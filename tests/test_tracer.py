@@ -19,13 +19,12 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from typing import Optional
 from unittest.mock import patch
 
 import pytest
 
-from agentfence.models import TraceStep
-from agentfence.tracer import Tracer
+from sentinel.models import TraceStep
+from sentinel.tracer import Tracer
 
 
 @pytest.fixture

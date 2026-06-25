@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-AgentFence Deploy Script — One-command deployment.
+Sentinel Deploy Script — One-command deployment.
 
 Usage:
-    python deploy.py              # Interactive mode
-    python deploy.py --docker     # Deploy with Docker Compose
-    python deploy.py --local      # Deploy locally (install + start)
-    python deploy.py --tunnel     # Expose via Cloudflare Tunnel
+python deploy.py              # Interactive mode
+python deploy.py --docker     # Deploy with Docker Compose
+python deploy.py --local      # Deploy locally (install + start)
+python deploy.py --tunnel     # Expose via Cloudflare Tunnel
 """
 
 import argparse
@@ -53,8 +53,8 @@ def check_cloudflared() -> bool:
 
 
 def deploy_local(args: argparse.Namespace) -> None:
-    """Deploy AgentFence locally."""
-    print("\n🛡️  AgentFence Local Deployment")
+    """Deploy Sentinel locally."""
+    print("\n🛡️  Sentinel Local Deployment")
     print("=" * 50)
 
     # Check Python
@@ -88,19 +88,19 @@ def deploy_local(args: argparse.Namespace) -> None:
         run([python_cmd, "-m", "pytest", "tests/", "-v"],
             cwd=str(PROJECT_ROOT))
 
-    print("\n✅ AgentFence installed successfully!")
+    print("\n✅ Sentinel installed successfully!")
     print("\nQuick start:")
-    print("  agentfence start          # Start the gateway")
-    print("  agentfence dashboard      # Start the dashboard")
-    print("  agentfence status         # Check health")
-    print("  agentfence audit          # View security log")
-    print("  agentfence sandbox --list # List tool policies")
+    print("  sentinel start          # Start the gateway")
+    print("  sentinel dashboard      # Start the dashboard")
+    print("  sentinel status         # Check health")
+    print("  sentinel audit          # View security log")
+    print("  sentinel sandbox --list # List tool policies")
     print()
 
 
 def deploy_docker(args: argparse.Namespace) -> None:
-    """Deploy AgentFence with Docker Compose."""
-    print("\n🛡️  AgentFence Docker Deployment")
+    """Deploy Sentinel with Docker Compose."""
+    print("\n🛡️  Sentinel Docker Deployment")
     print("=" * 50)
 
     if not check_docker():
@@ -118,7 +118,7 @@ def deploy_docker(args: argparse.Namespace) -> None:
             "AF_MOCK_MODE=true\n"
             "AF_LOG_LEVEL=INFO\n"
             "AF_LOG_FORMAT=json\n"
-            "AF_DATABASE_URL=sqlite+aiosqlite:///./data/agentfence.db\n"
+            "AF_DATABASE_URL=sqlite+aiosqlite:///./data/sentinel.db\n"
             "AF_TRACES_DIR=/app/traces\n"
         )
 
@@ -131,7 +131,7 @@ def deploy_docker(args: argparse.Namespace) -> None:
     run(cmd, cwd=str(PROJECT_ROOT))
 
     if args.detach:
-        print("\n✅ AgentFence running in background!")
+        print("\n✅ Sentinel running in background!")
         print("   Gateway:   http://localhost:8000")
         print("   Dashboard: http://localhost:8501")
         print("   Logs:      docker compose logs -f")
@@ -140,8 +140,8 @@ def deploy_docker(args: argparse.Namespace) -> None:
 
 
 def deploy_tunnel(args: argparse.Namespace) -> None:
-    """Expose AgentFence via Cloudflare Tunnel."""
-    print("\n🛡️  AgentFence Cloudflare Tunnel")
+    """Expose Sentinel via Cloudflare Tunnel."""
+    print("\n🛡️  Sentinel Cloudflare Tunnel")
     print("=" * 50)
 
     if not check_cloudflared():
@@ -159,7 +159,7 @@ def deploy_tunnel(args: argparse.Namespace) -> None:
         print(f"  ✅ Gateway running on port {port}")
     except Exception:
         print(f"  ⚠️  Gateway not detected on port {port}")
-        print(f"     Start it first: agentfence start --port {port}")
+        print(f"     Start it first: sentinel start --port {port}")
         if not args.force:
             sys.exit(1)
 
@@ -172,7 +172,7 @@ def deploy_tunnel(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="AgentFence Deploy Script",
+        description="Sentinel Deploy Script",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Examples:\n  python deploy.py --local         # Install and run locally\n  python deploy.py --docker -d     # Deploy with Docker in background\n  python deploy.py --tunnel        # Expose via Cloudflare Tunnel\n",
     )

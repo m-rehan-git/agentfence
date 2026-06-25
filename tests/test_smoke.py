@@ -1,18 +1,18 @@
-"""Quick smoke test to verify the full AgentFence stack works end-to-end."""
+"""Quick smoke test to verify the full Sentinel stack works end-to-end."""
 from __future__ import annotations
 
 import pytest
-from agentfence.models import ToolRequest, TraceStep, CircuitBreakerException
-from agentfence.cost_engine import estimate_cost, calculate_actual_cost, count_tokens
-from agentfence.budget_enforcer import BudgetEnforcer
-from agentfence.tracer import Tracer
-from agentfence.replay import ReplayEngine
-from agentfence.gateway import app
+from sentinel.models import TraceStep
+from sentinel.cost_engine import estimate_cost, calculate_actual_cost
+from sentinel.budget_enforcer import BudgetEnforcer
+from sentinel.tracer import Tracer
+from sentinel.replay import ReplayEngine
+from sentinel.gateway import app
 
 
 def test_all_modules_import() -> None:
-    """All agentfence modules should be importable."""
-    from agentfence import __version__
+    """All sentinel modules should be importable."""
+    from sentinel import __version__
     assert app is not None
     assert __version__ == "0.2.0"
 
@@ -58,7 +58,6 @@ def test_budget_enforcer_full_cycle(tmp_path) -> None:
 
 def test_tracer_roundtrip(tmp_path, monkeypatch) -> None:
     """Tracer should write and read back trace steps."""
-    import os
     traces_dir = tmp_path / "traces"
     db_path = tmp_path / "traces.db"
     tracer = Tracer(traces_dir=traces_dir, db_path=db_path)
@@ -83,7 +82,6 @@ def test_tracer_roundtrip(tmp_path, monkeypatch) -> None:
 
 def test_replay_engine(tmp_path, monkeypatch) -> None:
     """ReplayEngine should step through a trace."""
-    import os
     traces_dir = tmp_path / "traces"
     db_path = tmp_path / "traces.db"
     tracer = Tracer(traces_dir=traces_dir, db_path=db_path)

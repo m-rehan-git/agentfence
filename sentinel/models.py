@@ -1,12 +1,14 @@
 """
-Pydantic v2 models for AgentFence.
+Pydantic v2 models for Sentinel.
 
 All data flowing through the system is validated by these schemas:
 - ToolRequest  : What the agent wants to execute
-- ToolResponse : What AgentFence returned after execution
+- ToolResponse : What Sentinel returned after execution
 - TraceStep    : A single logged step in an execution trace
 - BudgetConfig : Current state of a task's budget
 - TaskStatus   : Enumeration of task lifecycle states
+- OpenAIChatRequest : OpenAI-compatible chat completion request
+- OpenAIChatResponse : OpenAI-compatible chat completion response
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ class TaskStatus(str, Enum):
 
 class ToolRequest(BaseModel):
     """
-    Represents a single tool call that an AI agent wants AgentFence to execute.
+    Represents a single tool call that an AI agent wants Sentinel to execute.
 
     Attributes:
         task_id: Unique identifier for the agent's task/session.
@@ -96,7 +98,7 @@ class ToolRequest(BaseModel):
 
 class ToolResponse(BaseModel):
     """
-    AgentFence's response after attempting to execute a tool call.
+    Sentinel's response after attempting to execute a tool call.
 
     Attributes:
         status: One of "success", "budget_exceeded", "circuit_breaker", "error".
@@ -138,7 +140,7 @@ class TraceStep(BaseModel):
     """
     A single logged step in an execution trace.
 
-    Each tool call that passes through AgentFence is recorded as a TraceStep,
+    Each tool call that passes through Sentinel is recorded as a TraceStep,
     written to both JSONL (append-only) and SQLite (queryable).
 
     Attributes:
@@ -270,3 +272,73 @@ class CircuitBreakerException(Exception):
             f"[{error_code}] Circuit breaker tripped for task {task_id}: "
             f"remaining=${remaining:.6f}, actual_cost=${actual_cost:.6f}"
         )
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-Compatible Models
+# ---------------------------------------------------------------------------
+
+class OpenAIMessage(BaseModel):
+    """A single message in an OpenAI chat completion request."""
+    role: str = Field(..., description="system | user | assistant | tool")
+    content: Optional[str] = Field(default=None, description="Message content")
+    name: Optional[str] = Field(default=None, description="Optional name")
+    tool_calls: Optional[list[dict[str, Any]]] = Field(default=None)
+    tool_call_id: Optional[str] = Field(default=None)
+
+
+class OpenAIFunction(BaseModel):
+    """Function/tool definition for OpenAI function calling."""
+    name: str
+    description: Optional[str] = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class OpenAIToolChoice(BaseModel):
+    """Tool choice configuration."""
+    type: str = "function"
+    function: Optional[dict[str, str]] = None
+
+
+class OpenAIChatRequest(BaseModel):
+    """
+    OpenAI-compatible chat completion request.
+    Used by POST /v1/chat/completions endpoint.
+    """
+    model: str = Field(default="gpt-4o", description="Model identifier")
+    messages: list[OpenAIMessage] = Field(default_factory=list, description="Chat messages")
+    max_tokens: Optional[int] = Field(default=None, description="Max output tokens")
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    n: Optional[int] = Field(default=None, ge=1, le=128)
+    stream: Optional[bool] = Field(default=False)
+    stop: Optional[list[str]] = Field(default=None)
+    presence_penalty: Optional[float] = Field(default=None, ge=-2.0, le=2.0)
+    frequency_penalty: Optional[float] = Field(default=None, ge=-2.0, le=2.0)
+    logit_bias: Optional[dict[str, float]] = Field(default=None)
+    user: Optional[str] = Field(default=None, description="End-user identifier")
+    tools: Optional[list[OpenAIFunction]] = Field(default=None, description="Available tools")
+    tool_choice: Optional[str | OpenAIToolChoice] = Field(default=None)
+    response_format: Optional[dict[str, Any]] = Field(default=None)
+
+    @property
+    def estimated_input_text(self) -> str:
+        """Extract all message content for token estimation."""
+        parts = []
+        for msg in self.messages:
+            if msg.content:
+                parts.append(msg.content)
+        return "\n".join(parts)
+
+
+class OpenAIChatResponse(BaseModel):
+    """
+    OpenAI-compatible chat completion response.
+    Returned by POST /v1/chat/completions endpoint.
+    """
+    id: str = Field(default="", description="Response identifier")
+    object: str = "chat.completion"
+    created: int = Field(default=0, description="Unix timestamp")
+    model: str = Field(default="", description="Model used")
+    choices: list[dict[str, Any]] = Field(default_factory=list)
+    usage: dict[str, int] = Field(default_factory=dict)

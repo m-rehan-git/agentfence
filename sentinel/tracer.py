@@ -22,8 +22,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator, Optional
 
-from agentfence.config import get_config
-from agentfence.models import TraceStep
+from sentinel.config import get_config
+from sentinel.models import TraceStep
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class Tracer:
             if db_url.startswith("sqlite:///"):
                 self._db_path = Path(db_url.replace("sqlite:///", ""))
             else:
-                self._db_path = Path("agentfence.db")
+                self._db_path = Path("sentinel.db")
 
         self._retry_max = cfg.database.retry_max_attempts
         self._retry_delay = cfg.database.retry_base_delay
