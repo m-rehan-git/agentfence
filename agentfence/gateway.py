@@ -54,6 +54,7 @@ from agentfence.security import (
     RiskLevel,
 )
 from agentfence.agent_registry import AgentRegistry, AgentIdentity
+from agentfence.replay_store import ReplayStore
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ _sandbox: Optional[ToolSandbox] = None
 _rate_limiter: Optional[RateLimiter] = None
 _audit: Optional[AuditLogger] = None
 _agent_registry: Optional[AgentRegistry] = None
-_replay_cursors: dict[str, int] = {}  # task_id → current cursor position
+_replay_store: Optional[ReplayStore] = None
 _startup_time: float = 0.0
 
 
@@ -76,7 +77,7 @@ _startup_time: float = 0.0
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: initialize resources on startup, cleanup on shutdown."""
-    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry, _replay_cursors, _startup_time, _cors_configured
+    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry, _replay_store, _startup_time, _cors_configured
 
     cfg = get_config()
     _startup_time = time.time()
@@ -113,6 +114,7 @@ async def lifespan(app: FastAPI):
         )
         _audit = AuditLogger()
         _agent_registry = AgentRegistry()
+        _replay_store = ReplayStore()
         _audit.log(
             SecurityEventType.SYSTEM_STARTUP,
             details={"version": "0.2.0", "mock_mode": cfg.is_mock_mode},
@@ -324,7 +326,7 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
     12. Audit log.
     13. Return response.
     """
-    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry, _replay_cursors
+    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry
 
     if _budget_enforcer is None or _tracer is None:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -681,19 +683,22 @@ async def get_replay_state(task_id: str) -> dict:
 @app.post("/v1/tasks/{task_id}/replay/next")
 async def replay_next(task_id: str) -> dict:
     """Advance the replay cursor by one step."""
-    global _replay_cursors
+    global _tracer, _replay_store
     engine = ReplayEngine(tracer=_tracer)
     engine.load_trace(task_id)
 
-    # Restore cursor position if it exists
-    if task_id in _replay_cursors:
-        engine.jump_to(_replay_cursors[task_id])
+    # Restore cursor position from persistent store
+    if _replay_store:
+        saved_step = _replay_store.get_cursor(task_id)
+        if saved_step > 0:
+            engine.jump_to(saved_step)
 
     step = engine.next_step()
     state = engine.get_state()
 
     # Persist cursor position
-    _replay_cursors[task_id] = state["current_step"]
+    if _replay_store:
+        _replay_store.save_cursor(task_id, state["current_step"])
 
     return {"state": state, "step": step.model_dump() if step else None}
 
@@ -701,19 +706,22 @@ async def replay_next(task_id: str) -> dict:
 @app.post("/v1/tasks/{task_id}/replay/prev")
 async def replay_prev(task_id: str) -> dict:
     """Rewind the replay cursor by one step."""
-    global _replay_cursors
+    global _tracer, _replay_store
     engine = ReplayEngine(tracer=_tracer)
     engine.load_trace(task_id)
 
-    # Restore cursor position if it exists
-    if task_id in _replay_cursors:
-        engine.jump_to(_replay_cursors[task_id])
+    # Restore cursor position from persistent store
+    if _replay_store:
+        saved_step = _replay_store.get_cursor(task_id)
+        if saved_step > 0:
+            engine.jump_to(saved_step)
 
     step = engine.prev_step()
     state = engine.get_state()
 
     # Persist cursor position
-    _replay_cursors[task_id] = state["current_step"]
+    if _replay_store:
+        _replay_store.save_cursor(task_id, state["current_step"])
 
     return {"state": state, "step": step.model_dump() if step else None}
 

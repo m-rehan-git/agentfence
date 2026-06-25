@@ -293,7 +293,7 @@ class TestConcurrentLogging:
                     tracer.log_step(task_id, step)
             except Exception as e:
                 with lock:
-                    errors.append(str(e))
+                    errors.append(f"thread-{thread_id}: {e}")
 
         threads = [threading.Thread(target=log_steps, args=(i,)) for i in range(num_threads)]
         for t in threads:

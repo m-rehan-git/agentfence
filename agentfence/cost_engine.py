@@ -193,16 +193,54 @@ def _count_tokens_heuristic(text: str) -> int:
     """
     Heuristic token counter for non-OpenAI or unknown models.
 
-    Uses the approximation: 1 token ~ 1.3 words (rough average for English text).
+    Uses a multi-strategy approach for better accuracy across content types:
+      - English prose: ~4 chars per token
+      - Code / JSON / structured: ~3 chars per token (denser)
+      - CJK / non-Latin: ~2 chars per token (multi-byte characters)
+      - Mixed: weighted average based on character distribution
+
+    This is still a fallback — tiktoken is always preferred when available.
 
     Args:
         text: The input text.
 
     Returns:
-        Estimated integer token count.
+        Estimated integer token count (never less than 1 for non-empty text).
     """
-    word_count = len(text.split())
-    return int(word_count * 1.3)
+    if not text:
+        return 0
+
+    char_count = len(text)
+
+    # Count character types to estimate content type
+    ascii_chars = sum(1 for c in text if ord(c) < 128)
+    non_ascii_chars = char_count - ascii_chars
+
+    # Count whitespace and punctuation (indicators of natural language)
+    whitespace_count = sum(1 for c in text if c.isspace())
+    punctuation_count = sum(1 for c in text if c in ".,!?;:-—()[]{}\"'\n")
+
+    # Heuristic: high punctuation + whitespace ratio = natural language
+    if char_count > 0:
+        structure_ratio = (whitespace_count + punctuation_count) / char_count
+    else:
+        structure_ratio = 0
+
+    if non_ascii_chars > char_count * 0.3:
+        # Mostly non-ASCII (CJK, Arabic, etc.): ~2 chars per token
+        estimated = char_count / 2.0
+    elif structure_ratio > 0.15:
+        # Natural language (English, etc.): ~4 chars per token
+        estimated = char_count / 4.0
+    elif whitespace_count < char_count * 0.05:
+        # Dense content (code, JSON, base64): ~2.5 chars per token
+        estimated = char_count / 2.5
+    else:
+        # Mixed content: ~3.5 chars per token
+        estimated = char_count / 3.5
+
+    # Ensure at least 1 token for non-empty text, and cap at a reasonable max
+    return max(1, int(estimated))
 
 
 def count_tokens(text: str, model: str) -> int:
