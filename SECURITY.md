@@ -10,7 +10,7 @@
 
 If you discover a security vulnerability in Sentinel, please report it responsibly:
 
-1. **Email**: Send details to security@sentinel.dev
+1. **Email**: Send details to rehan217021@gmail.com
 2. **Do NOT** open a public GitHub issue for security vulnerabilities
 3. Include:
    - Description of the vulnerability
