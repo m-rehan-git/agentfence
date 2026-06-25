@@ -159,92 +159,53 @@ def cmd_status(args: argparse.Namespace) -> None:
 
 def cmd_agents_list(args: argparse.Namespace) -> None:
     """List registered agents."""
-    from agentfence.config import get_config
-    from agentfence.security import AgentPolicy
+    from agentfence.agent_registry import AgentRegistry
 
-    cfg = get_config()
-    db_path = Path(cfg.database.url.replace("sqlite:///", ""))
+    registry = AgentRegistry()
+    agents = registry.list_agents()
 
-    import sqlite3
+    if not agents:
+        print("No agents registered.")
+        return
 
-    try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        cursor = conn.execute("SELECT * FROM agents ORDER BY created_at DESC")
-        rows = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-
-        if not rows:
-            print("No agents registered.")
-            return
-
-        if args.json:
-            print(json.dumps(rows, indent=2, default=str))
-        else:
-            print(f"{'Agent ID':<30} {'Name':<20} {'Budget':>10} {'RPM':>5} {'Enabled':>8}")
-            print("-" * 80)
-            for row in rows:
-                print(
-                    f"{row['agent_id']:<30} {row.get('agent_name', ''):<20} "
-                    f"${row.get('max_budget_usd', 0):>8.2f} {row.get('max_requests_per_minute', 0):>5} "
-                    f"{'✓' if row.get('enabled', 1) else '✗':>7}"
-                )
-    except Exception as e:
-        print(f"Error listing agents: {e}")
+    if args.json:
+        print(json.dumps([a.to_dict() for a in agents], indent=2))
+    else:
+        print(f"{'Agent ID':<30} {'Name':<20} {'Budget':>10} {'RPM':>5} {'Enabled':>8}")
+        print("-" * 80)
+        for a in agents:
+            print(
+                f"{a.agent_id:<30} {a.agent_name:<20} "
+                f"${a.max_budget_usd:>8.2f} {a.max_requests_per_minute:>5} "
+                f"{'✓' if a.enabled else '✗':>8}"
+            )
 
 
 def cmd_agents_add(args: argparse.Namespace) -> None:
     """Register a new agent."""
-    from agentfence.config import get_config
+    from agentfence.agent_registry import AgentRegistry
 
-    cfg = get_config()
-    db_path = Path(cfg.database.url.replace("sqlite:///", ""))
-
-    import sqlite3
-
-    conn = sqlite3.connect(str(db_path))
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS agents (
-            agent_id TEXT PRIMARY KEY,
-            agent_name TEXT DEFAULT '',
-            allowed_tools TEXT DEFAULT '[]',
-            blocked_tools TEXT DEFAULT '[]',
-            max_budget_usd REAL DEFAULT 10.0,
-            max_requests_per_minute INTEGER DEFAULT 30,
-            enabled INTEGER DEFAULT 1,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """
+    registry = AgentRegistry()
+    identity, raw_key = registry.create_agent(
+        agent_id=args.agent_id,
+        agent_name=args.name,
+        max_budget_usd=args.budget,
+        max_requests_per_minute=args.rpm,
     )
-    conn.execute(
-        """
-        INSERT OR REPLACE INTO agents (agent_id, agent_name, max_budget_usd, max_requests_per_minute)
-        VALUES (?, ?, ?, ?)
-        """,
-        (args.agent_id, args.name, args.budget, args.rpm),
-    )
-    conn.commit()
-    conn.close()
-    print(f"✅ Agent '{args.agent_id}' registered (budget=${args.budget:.2f}, rpm={args.rpm})")
+    print(f"✅ Agent '{args.agent_id}' registered successfully")
+    print(f"   Budget: ${args.budget:.2f}")
+    print(f"   RPM:    {args.rpm}")
+    print(f"")
+    print(f"   🔑 API Key (save this — it won't be shown again):")
+    print(f"   {raw_key}")
 
 
 def cmd_agents_remove(args: argparse.Namespace) -> None:
     """Remove an agent."""
-    from agentfence.config import get_config
+    from agentfence.agent_registry import AgentRegistry
 
-    cfg = get_config()
-    db_path = Path(cfg.database.url.replace("sqlite:///", ""))
-
-    import sqlite3
-
-    conn = sqlite3.connect(str(db_path))
-    cursor = conn.execute("DELETE FROM agents WHERE agent_id = ?", (args.agent_id,))
-    conn.commit()
-    removed = cursor.rowcount
-    conn.close()
-
-    if removed:
+    registry = AgentRegistry()
+    if registry.delete_agent(args.agent_id):
         print(f"✅ Agent '{args.agent_id}' removed")
     else:
         print(f"⚠️  Agent '{args.agent_id}' not found")

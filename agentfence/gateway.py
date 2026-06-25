@@ -53,6 +53,7 @@ from agentfence.security import (
     SecurityEventType,
     RiskLevel,
 )
+from agentfence.agent_registry import AgentRegistry, AgentIdentity
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,8 @@ _tracer: Optional[Tracer] = None
 _sandbox: Optional[ToolSandbox] = None
 _rate_limiter: Optional[RateLimiter] = None
 _audit: Optional[AuditLogger] = None
+_agent_registry: Optional[AgentRegistry] = None
+_replay_cursors: dict[str, int] = {}  # task_id → current cursor position
 _startup_time: float = 0.0
 
 
@@ -73,10 +76,22 @@ _startup_time: float = 0.0
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: initialize resources on startup, cleanup on shutdown."""
-    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _startup_time
+    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry, _replay_cursors, _startup_time, _cors_configured
 
     cfg = get_config()
     _startup_time = time.time()
+
+    # Configure CORS middleware now that config is loaded
+    if not _cors_configured:
+        from starlette.middleware.cors import CORSMiddleware as _CM
+        app.add_middleware(
+            _CM,
+            allow_origins=cfg.gateway.cors_origins,
+            allow_credentials=len(cfg.gateway.cors_origins) > 0 and cfg.gateway.cors_origins != ["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        _cors_configured = True
 
     logger.info(
         "AgentFence starting up",
@@ -97,6 +112,7 @@ async def lifespan(app: FastAPI):
             burst_size=cfg.gateway.rate_limit_rpm,
         )
         _audit = AuditLogger()
+        _agent_registry = AgentRegistry()
         _audit.log(
             SecurityEventType.SYSTEM_STARTUP,
             details={"version": "0.2.0", "mock_mode": cfg.is_mock_mode},
@@ -128,13 +144,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware will be configured in lifespan (after config loads)
+_cors_configured = False
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +324,7 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
     12. Audit log.
     13. Return response.
     """
-    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit
+    global _budget_enforcer, _tracer, _sandbox, _rate_limiter, _audit, _agent_registry, _replay_cursors
 
     if _budget_enforcer is None or _tracer is None:
         raise HTTPException(status_code=503, detail="Service not initialized")
@@ -321,14 +332,51 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
     cfg = get_config()
     step_id = str(uuid.uuid4())
     start_time = time.monotonic()
-    agent_id = request.params.get("_agent_id", "default")
 
+    # Step 1: Authenticate the agent
+    agent_key = request.params.get("_agent_key", "")
+    agent_id = request.params.get("_agent_id", "")
+
+    if _agent_registry and agent_key:
+        agent = _agent_registry.authenticate(agent_key)
+        if agent is None:
+            if _audit:
+                _audit.log(
+                    SecurityEventType.AGENT_AUTH_FAILED,
+                    agent_id=agent_id,
+                    task_id=request.task_id,
+                    details={"reason": "invalid_key", "agent_id": agent_id},
+                    risk_level=RiskLevel.HIGH,
+                )
+            raise HTTPException(status_code=401, detail="Invalid agent API key")
+        effective_agent_id = agent.agent_id
+        agent_budget_cap = agent.max_budget_usd
+        agent_max_rpm = agent.max_requests_per_minute
+        agent_allowed_tools = agent.allowed_tools
+        agent_blocked_tools = agent.blocked_tools
+    else:
+        # Default agent (no key provided) — most restrictive defaults
+        effective_agent_id = agent_id or "default"
+        agent_budget_cap = cfg.default_budget_usd
+        agent_max_rpm = cfg.gateway.rate_limit_rpm
+        agent_allowed_tools = set()
+        agent_blocked_tools = set()
     # Step 2: Security — Sandbox check
     if _sandbox:
+        # Build agent policy for sandbox check
+        agent_policy = None
+        if agent_allowed_tools or agent_blocked_tools:
+            from agentfence.security import AgentPolicy
+            agent_policy = AgentPolicy(
+                agent_id=effective_agent_id,
+                allowed_tools=agent_allowed_tools,
+                blocked_tools=agent_blocked_tools,
+            )
         sandbox_result = _sandbox.check(
             tool_name=request.tool_name,
             params=request.params,
             input_text=request.estimated_input,
+            agent_policy=agent_policy,
         )
         if not sandbox_result:
             elapsed_ms = (time.monotonic() - start_time) * 1000
@@ -390,28 +438,25 @@ async def execute_tool(request: ToolRequest) -> ToolResponse:
             if _audit:
                 _audit.log(
                     SecurityEventType.INPUT_VALIDATION_FAILED,
-                    agent_id=agent_id,
+                    agent_id=effective_agent_id,
                     task_id=request.task_id,
                     details={
                         "tool": request.tool_name,
                         "injection_patterns_found": len(injection_matches),
                     },
-                    risk_level=RiskLevel.HIGH,
+                    risk_level=RiskLevel.CRITICAL,
                 )
-            # Log but don't block — just warn
-            logger.warning(
-                "Potential prompt injection detected",
-                extra={
-                    "task_id": request.task_id,
-                    "agent_id": agent_id,
-                    "patterns": len(injection_matches),
-                },
+            # Block the request — prompt injection detected
+            raise HTTPException(
+                status_code=400,
+                detail="Prompt injection detected. Request blocked.",
             )
 
-    # Step 5: Ensure task budget exists
+    # Step 5: Ensure task budget exists (use agent's budget cap)
     existing_budget = _budget_enforcer.get_budget_config(request.task_id)
     if existing_budget is None:
-        _budget_enforcer.init_task(request.task_id, cfg.default_budget_usd)
+        effective_budget = min(agent_budget_cap, cfg.default_budget_usd * 10)
+        _budget_enforcer.init_task(request.task_id, effective_budget)
 
     # Step 6: Estimate cost
     estimated_cost = estimate_cost(
@@ -636,26 +681,40 @@ async def get_replay_state(task_id: str) -> dict:
 @app.post("/v1/tasks/{task_id}/replay/next")
 async def replay_next(task_id: str) -> dict:
     """Advance the replay cursor by one step."""
+    global _replay_cursors
     engine = ReplayEngine(tracer=_tracer)
-    try:
-        engine.load_trace(task_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No trace found for task '{task_id}'.")
+    engine.load_trace(task_id)
+
+    # Restore cursor position if it exists
+    if task_id in _replay_cursors:
+        engine.jump_to(_replay_cursors[task_id])
+
     step = engine.next_step()
     state = engine.get_state()
+
+    # Persist cursor position
+    _replay_cursors[task_id] = state["current_step"]
+
     return {"state": state, "step": step.model_dump() if step else None}
 
 
 @app.post("/v1/tasks/{task_id}/replay/prev")
 async def replay_prev(task_id: str) -> dict:
     """Rewind the replay cursor by one step."""
+    global _replay_cursors
     engine = ReplayEngine(tracer=_tracer)
-    try:
-        engine.load_trace(task_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No trace found for task '{task_id}'.")
+    engine.load_trace(task_id)
+
+    # Restore cursor position if it exists
+    if task_id in _replay_cursors:
+        engine.jump_to(_replay_cursors[task_id])
+
     step = engine.prev_step()
     state = engine.get_state()
+
+    # Persist cursor position
+    _replay_cursors[task_id] = state["current_step"]
+
     return {"state": state, "step": step.model_dump() if step else None}
 
 
@@ -746,3 +805,54 @@ async def get_rate_limit_status(agent_id: str) -> dict:
     if _rate_limiter is None:
         raise HTTPException(status_code=503, detail="Rate limiter not initialized")
     return {"agent_id": agent_id, "remaining_tokens": _rate_limiter.get_remaining(agent_id)}
+
+
+# ---------------------------------------------------------------------------
+# Agent Management Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/v1/agents")
+async def list_agents() -> dict:
+    """List all registered agents."""
+    if _agent_registry is None:
+        raise HTTPException(status_code=503, detail="Agent registry not initialized")
+    agents = _agent_registry.list_agents()
+    return {"agents": [a.to_dict() for a in agents], "count": len(agents)}
+
+
+@app.get("/v1/agents/{agent_id}")
+async def get_agent(agent_id: str) -> dict:
+    """Get a specific agent's details (without API key)."""
+    if _agent_registry is None:
+        raise HTTPException(status_code=503, detail="Agent registry not initialized")
+    agent = _agent_registry.get_agent(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
+    return agent.to_dict()
+
+
+@app.post("/v1/agents/{agent_id}/disable")
+async def disable_agent(agent_id: str) -> dict:
+    """Disable an agent (blocks all requests)."""
+    if _agent_registry is None:
+        raise HTTPException(status_code=503, detail="Agent registry not initialized")
+    if _agent_registry.disable_agent(agent_id):
+        if _audit:
+            _audit.log(
+                SecurityEventType.POLICY_VIOLATION,
+                agent_id=agent_id,
+                details={"action": "disabled"},
+                risk_level=RiskLevel.MEDIUM,
+            )
+        return {"status": "disabled", "agent_id": agent_id}
+    raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")
+
+
+@app.post("/v1/agents/{agent_id}/enable")
+async def enable_agent(agent_id: str) -> dict:
+    """Re-enable an agent."""
+    if _agent_registry is None:
+        raise HTTPException(status_code=503, detail="Agent registry not initialized")
+    if _agent_registry.enable_agent(agent_id):
+        return {"status": "enabled", "agent_id": agent_id}
+    raise HTTPException(status_code=404, detail=f"Agent '{agent_id}' not found")

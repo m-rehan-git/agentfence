@@ -38,6 +38,7 @@ from agentfence.security import (
     SecurityEventType,
     RiskLevel,
 )
+from agentfence.agent_registry import AgentRegistry, AgentIdentity
 
 __version__ = "0.2.0"
 
@@ -63,4 +64,7 @@ __all__ = [
     "AgentPolicy",
     "SecurityEventType",
     "RiskLevel",
+    # Agent Registry
+    "AgentRegistry",
+    "AgentIdentity",
 ]

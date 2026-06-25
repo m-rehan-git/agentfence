@@ -342,6 +342,11 @@ class Config(BaseSettings):
         """Path to the pricing JSON file."""
         return Path(self.budget.pricing_path)
 
+    @property
+    def request_timeout_seconds(self) -> float:
+        """Request timeout in seconds for outbound provider calls."""
+        return self.gateway.request_timeout
+
 
 @lru_cache(maxsize=1)
 def get_config() -> Config:
